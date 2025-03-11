@@ -1,0 +1,3 @@
+import cryptocompare as cc
+
+CRYPTOCOMPARE_API_KEY = fd5ae8d2c2fc4786bcf5fb8b3c1ac2deefc35f26a163cf4b4cfcaddbd5b7e6c7
