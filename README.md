@@ -1,1 +1,1 @@
-# AI-chan_Trader
+# AI-chan Trader
