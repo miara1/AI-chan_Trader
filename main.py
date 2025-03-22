@@ -1,21 +1,20 @@
 from asset import Asset
 from constants import BTCUSD, BTC_CSV_FILE_NAME
 from constants import DXY_CSV_FILE_NAME, DXY, DXY_START_DATE
+from constants import MERGED_CSV_FILE_NAME
 import matplotlib.pyplot as plt
+from mergeDataProcessor import MergeDataProcessor
+from prepareRNNData import PrepareRNNData
+
 btcusd = Asset(symbol=BTCUSD, interval="1d", period="max")
 dxy = Asset(symbol=DXY, interval="1d", start=DXY_START_DATE)
 
 btcusd.saveHistoryToCsv(fileName=BTC_CSV_FILE_NAME)
 dxy.saveHistoryToCsv(fileName=DXY_CSV_FILE_NAME)
 
-pctChangeBTC = btcusd.getRowValues("Daily % Change")
+dxy.deleteRow(name="Volume")
 
-print(pctChangeBTC)
-print(dxy.getRowValues("Daily % Change"))
+mergedFile = MergeDataProcessor(BTC_CSV_FILE_NAME, DXY_CSV_FILE_NAME)
+mergedFile.saveToCsv(MERGED_CSV_FILE_NAME)
 
-btcusd.plotColumn(columnName="Open")
-btcusd.plotColumn(columnName="Close")
-dxy.plotColumn("Close")
-
-plt.show()
-
+RNNData = PrepareRNNData()
