@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import joblib as jl
 from sklearn.preprocessing import StandardScaler
-from constants import SPLIT_DATE, MERGED_CSV_FILE_NAME, ANALISYS_INDICATORS, SEQUENCE_LENGTH
+from constants import SPLIT_DATE, MERGED_CSV_FILE_NAME, ANALISYS_INDICATORS, SEQUENCE_LENGTH, INDICATOR_SCALER_FILE, TARGET_SCALER_FILE
 
 class PrepareRNNData:
     def __init__(self, sequenceLength=SEQUENCE_LENGTH, splitDate=SPLIT_DATE,
@@ -50,5 +50,5 @@ class PrepareRNNData:
         self.saveScalers()
 
     def saveScalers(self):
-        jl.dump(self.indicatorStandardScaler, "indicatorScaler.pkl")
-        jl.dump(self.targetScaler, "targetScaler.pkl")
+        jl.dump(self.indicatorStandardScaler, INDICATOR_SCALER_FILE)
+        jl.dump(self.targetScaler, TARGET_SCALER_FILE)
