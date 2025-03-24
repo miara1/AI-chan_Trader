@@ -8,7 +8,9 @@ from prepareRNNData import PrepareRNNData
 from lstmModel import RNNLSTMModel
 from sklearn.preprocessing import StandardScaler
 import joblib as jl
+from tensorflow.python.client import device_lib
 
+print(device_lib.list_local_devices())
 
 btcusd = Asset(symbol=BTCUSD, interval="1d", period="max")
 dxy = Asset(symbol=DXY, interval="1d", start=DXY_START_DATE)
@@ -22,6 +24,8 @@ mergedFile = MergeDataProcessor(BTC_CSV_FILE_NAME, DXY_CSV_FILE_NAME)
 mergedFile.saveToCsv(MERGED_CSV_FILE_NAME)
 
 RNNData = PrepareRNNData()
+RNNData.savePreparedDataToCsv("TrainData.csv")
+RNNData.savePreparedDataToCsv("TestData.csv", False)
 
 # Tworzenie i trenowanie modelu
 model = RNNLSTMModel(RNNData.XTrain, RNNData.yTrain,

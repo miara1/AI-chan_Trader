@@ -1,8 +1,20 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.layers import LeakyReLU, PReLU
 import matplotlib.pyplot as plt
-from constants import HOW_MANY_OUTPUTS, TARGET_SCALER_FILE, NUMBER_OF_NEURONS, DENSE, DROPOUT, BATCH_SIZE, EPOCHS
+from constants import (
+    RETURN_SEQUENCES,
+    HOW_MANY_OUTPUTS,
+    TARGET_SCALER_FILE,
+    NUMBER_OF_NEURONS,
+    DENSE,
+    DROPOUT,
+    BATCH_SIZE,
+    EPOCHS,
+    ALPHA,
+    RE_LU
+    )
 from joblib import load
 import numpy as np
 
@@ -15,11 +27,32 @@ class RNNLSTMModel:
 
 
     def buildModel(self, numberOfNeurons=NUMBER_OF_NEURONS,
-                   dropout=DROPOUT, dense=DENSE):
+                   dropout=DROPOUT, dense=DENSE,
+                   returnSequences = RETURN_SEQUENCES,
+                   _alpha=ALPHA, reLu=RE_LU):
         model = Sequential()
-        model.add(LSTM(NUMBER_OF_NEURONS, return_sequences=False, input_shape=(self.XTrain.shape[1], self.XTrain.shape[2])))
-        model.add(Dropout(DROPOUT))
-        model.add(Dense(DENSE))
+
+        # Pierwsza warstwa modelu
+        model.add(LSTM(numberOfNeurons, return_sequences=returnSequences,
+                       input_shape=(self.XTrain.shape[1], self.XTrain.shape[2])))
+        model.add(Dropout(dropout))
+
+        # Druga warstwa modelu w przypadku
+        # wlaczenia return sequences
+        if returnSequences:
+            model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
+            model.add(Dropout(dropout))
+
+        model.add(Dense(dense))
+
+        if reLu == "_ReLu":
+            pass
+        elif reLu == "Leaky": 
+            model.add(LeakyReLU(alpha=_alpha))
+
+        elif reLu == "P":
+            model.add(PReLU())
+        
         model.compile(optimizer='adam', loss='mse', metrics=['mae'])
         return model
     
