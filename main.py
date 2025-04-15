@@ -9,6 +9,22 @@ from lstmModel import RNNLSTMModel
 from sklearn.preprocessing import StandardScaler
 import joblib as jl
 from tensorflow.python.client import device_lib
+import os
+import tensorflow as tf
+
+# from keras.backend.tensorflow_backend import set_session
+
+# Wypisac co mozemy zoptymalizowac, jakie wersje mozemy testowac
+# Dodac zbior testowy
+print("Wersja TensorFlow:", tf.__version__)
+print("Czy TensorFlow widzi GPU?:", tf.config.list_physical_devices('GPU'))
+os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+# config = tf.ConfigProto()
+# config.gpu_options.allow_growth = True
+# set_session(tf.Session(config=config))
 
 print(device_lib.list_local_devices())
 
@@ -29,6 +45,7 @@ RNNData.savePreparedDataToCsv("TestData.csv", False)
 
 # Tworzenie i trenowanie modelu
 model = RNNLSTMModel(RNNData.XTrain, RNNData.yTrain,
+                     RNNData.XVal, RNNData.yVal,
                      RNNData.XTest, RNNData.yTest)
 model.train()
 

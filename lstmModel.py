@@ -13,15 +13,20 @@ from constants import (
     BATCH_SIZE,
     EPOCHS,
     ALPHA,
-    RE_LU
+    RE_LU,
+    SCALER_TYPE,
+    DAYS_PREDICTION_FORWARD,
+    LOSS,
+    HUBER_DELTA
     )
 from joblib import load
 import numpy as np
 
 class RNNLSTMModel:
-    def __init__(self, XTrain, yTrain, XTest, yTest):
+    def __init__(self, XTrain, yTrain, XVal, yVal, XTest, yTest):
 
         self.XTrain, self.yTrain = XTrain, yTrain
+        self.XVal, self.yVal = XVal, yVal
         self.XTest, self.yTest = XTest, yTest
         self.model = self.buildModel()
 
@@ -29,7 +34,8 @@ class RNNLSTMModel:
     def buildModel(self, numberOfNeurons=NUMBER_OF_NEURONS,
                    dropout=DROPOUT, dense=DENSE,
                    returnSequences = RETURN_SEQUENCES,
-                   _alpha=ALPHA, reLu=RE_LU):
+                   _alpha=ALPHA, reLu=RE_LU,
+                   loss=LOSS, huber_delta=HUBER_DELTA):
         model = Sequential()
 
         # Pierwsza warstwa modelu
@@ -39,12 +45,19 @@ class RNNLSTMModel:
 
         # Druga warstwa modelu w przypadku
         # wlaczenia return sequences
-        if returnSequences:
+        if returnSequences is True:
+            # Druga warstwa LSTM
+            model.add(LSTM(numberOfNeurons // 2, return_sequences=True))
+            model.add(Dropout(dropout))
+
+            # Trzecia warstwa LSTM
             model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
             model.add(Dropout(dropout))
 
         model.add(Dense(dense))
+        # model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
 
+        # Wybierz ReLU
         if reLu == "_ReLu":
             pass
         elif reLu == "Leaky": 
@@ -53,7 +66,16 @@ class RNNLSTMModel:
         elif reLu == "P":
             model.add(PReLU())
         
-        model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+        # Wybierz jak obliczac loss
+        if loss == "mse":
+            model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+        elif loss == "Huber":
+            model.compile(optimizer='adam', loss=tf.keras.losses.Huber(delta=huber_delta), metrics=['mae'])
+        elif loss == "binary_crossentropy":
+            model.compile(optimizer='adam', loss="binary_crossentropy", metrics=['accuracy'])
+        else:
+            raise NameError(f"Loss not recognized '{loss}'")
+        
         return model
     
     def train(self, epochs=EPOCHS,
@@ -61,24 +83,46 @@ class RNNLSTMModel:
         history = self.model.fit(self.XTrain, self.yTrain,
                                  epochs=epochs,
                                  batch_size=batchSize,
-                                 validation_data=(self.XTest, self.yTest),
+                                 validation_data=(self.XVal, self.yVal),
                                  verbose=1
                                  )
         self.plotLoss(history)
 
     def plotLoss(self, history):
-        plt.plot(history.history['loss'], label='Loss')
-        plt.plot(history.history['val_loss'], label='ValLoss')
-        plt.legend()
-        plt.title("Training vs Validation Loss")
-        plt.xlabel("Epoch")
-        plt.ylabel("MSE")
-        plt.grid(True)
+
+        # Tworzymy 2 panele: wykres + parametry
+        fig, (ax_loss, ax_params) = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
+
+        # Panel wykresu strat
+        ax_loss.plot(history.history['loss'], label='Loss')
+        ax_loss.plot(history.history['val_loss'], label='ValLoss')
+        ax_loss.set_title("Training vs Validation Loss")
+        ax_loss.set_xlabel("Epoch")
+        ax_loss.set_ylabel("Loss")
+        ax_loss.legend()
+        ax_loss.grid(True)
+
+        # Panel z parametrami modelu
+        param_text = (
+            f"Neurons: {NUMBER_OF_NEURONS}\n"
+            f"Dropout: {DROPOUT}\n"
+            f"Return Sequences: {RETURN_SEQUENCES}\n"
+            f"ReLU type: {RE_LU}" + (f" (alpha={ALPHA})" if RE_LU == "Leaky" else "") + "\n"
+            f"Batch Size: {BATCH_SIZE}\n"
+            f"Epochs: {EPOCHS}\n"
+            f"Loss: {LOSS}" + (f": (delta={HUBER_DELTA})" if LOSS == "Huber" else "") + "\n"
+            f"Scaler: {SCALER_TYPE}\n"
+            f"Prediction forward: +{DAYS_PREDICTION_FORWARD} day(s)"
+        )
+        ax_params.axis('off')  # Ukrywamy osie
+        ax_params.text(0.01, 0.98, param_text, va='top', fontsize=10)
+
+        plt.tight_layout()
         plt.show()
 
     def evaluate(self):
         mse, mae = self.model.evaluate(self.XTest, self.yTest)
-        print(f"Test MSE: {mse:.4f}\nTest MAE: {mae:0.4f}")
+        print(f"\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\nTest MSE: {mse:.4f}\nTest MAE: {mae:0.4f}\n!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n")
 
     def predict(self):
         return self.model.predict(self.XTest)
