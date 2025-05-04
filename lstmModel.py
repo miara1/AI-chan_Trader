@@ -12,10 +12,10 @@ from constants import (
     DROPOUT,
     BATCH_SIZE,
     EPOCHS,
-    ALPHA,
+    NEGATIVE_SLOPE,
     RE_LU,
     SCALER_TYPE,
-    DAYS_PREDICTION_FORWARD,
+    INTERVALS_PREDICTION_FORWARD,
     LOSS,
     HUBER_DELTA
     )
@@ -34,37 +34,60 @@ class RNNLSTMModel:
     def buildModel(self, numberOfNeurons=NUMBER_OF_NEURONS,
                    dropout=DROPOUT, dense=DENSE,
                    returnSequences = RETURN_SEQUENCES,
-                   _alpha=ALPHA, reLu=RE_LU,
+                   negativeSlope=NEGATIVE_SLOPE, reLu=RE_LU,
                    loss=LOSS, huber_delta=HUBER_DELTA):
         model = Sequential()
 
         # Pierwsza warstwa modelu
         model.add(LSTM(numberOfNeurons, return_sequences=returnSequences,
                        input_shape=(self.XTrain.shape[1], self.XTrain.shape[2])))
+
         model.add(Dropout(dropout))
 
         # Druga warstwa modelu w przypadku
         # wlaczenia return sequences
         if returnSequences is True:
             # Druga warstwa LSTM
-            model.add(LSTM(numberOfNeurons // 2, return_sequences=True))
+            model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
+
             model.add(Dropout(dropout))
 
             # Trzecia warstwa LSTM
-            model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
-            model.add(Dropout(dropout))
+            # model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
+            # model.add(Dropout(dropout))
 
-        model.add(Dense(dense))
+        model.add(Dense(numberOfNeurons // 2))
         # model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
-
+        
         # Wybierz ReLU
         if reLu == "_ReLu":
-            pass
+            model.add(tf.keras.layers.ReLU())
         elif reLu == "Leaky": 
-            model.add(LeakyReLU(alpha=_alpha))
-
+            model.add(LeakyReLU(negative_slope=negativeSlope))
         elif reLu == "P":
             model.add(PReLU())
+        elif reLu == "tanh":
+            model.add(tf.keras.layers.Activation('tanh'))
+
+        model.add(Dropout(dropout))
+
+        model.add(Dense(numberOfNeurons // 4))
+        # model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
+        
+        # Wybierz ReLU
+        if reLu == "_ReLu":
+            model.add(tf.keras.layers.ReLU())
+        elif reLu == "Leaky": 
+            model.add(LeakyReLU(negative_slope=negativeSlope))
+        elif reLu == "P":
+            model.add(PReLU())
+        elif reLu == "tanh":
+            model.add(tf.keras.layers.Activation('tanh'))
+
+        model.add(Dropout(dropout))
+
+        model.add(Dense(dense))  # wynik końcowy
+
         
         # Wybierz jak obliczac loss
         if loss == "mse":
@@ -86,7 +109,10 @@ class RNNLSTMModel:
                                  validation_data=(self.XVal, self.yVal),
                                  verbose=1
                                  )
+        self.evaluate()
         self.plotLoss(history)
+        self.evaluateDirectionAccuracy()
+        self.printPredictionsVsActual()
 
     def plotLoss(self, history):
 
@@ -107,18 +133,18 @@ class RNNLSTMModel:
             f"Neurons: {NUMBER_OF_NEURONS}\n"
             f"Dropout: {DROPOUT}\n"
             f"Return Sequences: {RETURN_SEQUENCES}\n"
-            f"ReLU type: {RE_LU}" + (f" (alpha={ALPHA})" if RE_LU == "Leaky" else "") + "\n"
+            f"ReLU type: {RE_LU}" + (f" (alpha={NEGATIVE_SLOPE})" if RE_LU == "Leaky" else "") + "\n"
             f"Batch Size: {BATCH_SIZE}\n"
             f"Epochs: {EPOCHS}\n"
             f"Loss: {LOSS}" + (f": (delta={HUBER_DELTA})" if LOSS == "Huber" else "") + "\n"
             f"Scaler: {SCALER_TYPE}\n"
-            f"Prediction forward: +{DAYS_PREDICTION_FORWARD} day(s)"
+            f"Prediction forward: +{INTERVALS_PREDICTION_FORWARD} interval(s)"
         )
         ax_params.axis('off')  # Ukrywamy osie
         ax_params.text(0.01, 0.98, param_text, va='top', fontsize=10)
 
         plt.tight_layout()
-        plt.show()
+        plt.show(block=False)
 
     def evaluate(self):
         mse, mae = self.model.evaluate(self.XTest, self.yTest)
@@ -161,6 +187,30 @@ class RNNLSTMModel:
         correct = np.sum(predSigns == trueSigns)
         total = len(realYTest)
         accuracy = correct / total
+
+        # Wyswietl na wykresie predykcje vs rzeczywistosc
+        plt.figure(figsize=(12, 6))
+
+        # Tworzenie osi x
+        x_axis = range(len(realYTest))
+
+        # Wykresl rzeczywiste wartosci i predykcje
+        plt.plot(x_axis, realYTest, label='Rzeczywiste', color='blue')
+        plt.plot(x_axis, realPredictions, label='Predykcje', color='red')
+
+        # Dodaj siatke
+        plt.grid(True)
+
+        # Legenda
+        plt.legend()
+
+        # Etykiety i tytul
+        plt.title("Rzeczywiste vs Predykcje")
+        plt.xlabel("Próba")
+        plt.ylabel("Wartość")
+
+        # Pokaz wykres
+        plt.show()
 
         print(f"Direction accuracy: {accuracy * 100:.2f}% ({correct}/{total})")
         return accuracy

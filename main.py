@@ -11,6 +11,7 @@ import joblib as jl
 from tensorflow.python.client import device_lib
 import os
 import tensorflow as tf
+from constants import TIME_INTERVAL
 
 # from keras.backend.tensorflow_backend import set_session
 
@@ -28,8 +29,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 print(device_lib.list_local_devices())
 
-btcusd = Asset(symbol=BTCUSD, interval="1d", period="max")
-dxy = Asset(symbol=DXY, interval="1d", start=DXY_START_DATE)
+btcusd = Asset(symbol=BTCUSD, interval=TIME_INTERVAL, period="max")
+dxy = Asset(symbol=DXY, interval=TIME_INTERVAL, start=DXY_START_DATE)
 
 btcusd.saveHistoryToCsv(fileName=BTC_CSV_FILE_NAME)
 dxy.saveHistoryToCsv(fileName=DXY_CSV_FILE_NAME)
@@ -48,8 +49,3 @@ model = RNNLSTMModel(RNNData.XTrain, RNNData.yTrain,
                      RNNData.XVal, RNNData.yVal,
                      RNNData.XTest, RNNData.yTest)
 model.train()
-
-model.evaluate()
-
-model.printPredictionsVsActual()
-model.evaluateDirectionAccuracy()

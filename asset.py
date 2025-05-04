@@ -5,10 +5,11 @@ import pandas as pd
 from constants import EMAPeriodList, FIBO_LEVELS, USE_FIBO
 from scipy.signal import argrelextrema
 import numpy as np
+from constants import TIME_INTERVAL
 
 # Klasa dla ustalonego aktywa
 class Asset:
-    def __init__(self, symbol, interval = "1d", period = "max", start = None ):
+    def __init__(self, symbol, interval = TIME_INTERVAL, period = "max", start = None ):
         self.symbol = symbol
         self.interval = interval
         self.period = period
@@ -37,8 +38,8 @@ class Asset:
     
         rawHistory["Date"] = pd.to_datetime(rawHistory["Date"]).dt.strftime("%Y-%m-%d")
 
-        # Obliczanie dziennej zmiany procentowej na podstawie kolumny ,,Close''
-        rawHistory['Daily%Change'] = ( (rawHistory['Close'] - rawHistory['Close'].shift(1)) / rawHistory['Close'].shift(1) ) * 100
+        # Obliczanie zmiany procentowej dla danego interwału
+        rawHistory['PriceChange'] = ( (rawHistory['Close'] - rawHistory['Close'].shift(1)) / rawHistory['Close'].shift(1) ) * 100
 
         rawHistory['RSI'] = self.calculateRSI(_rawHistory=rawHistory)
 
@@ -209,4 +210,4 @@ class Asset:
         if _rawHistory is None:
             raise ValueError("No data file in addMoveSigns!")
         
-        _rawHistory["MoveDirection"] = _rawHistory["Daily%Change"].apply(lambda x: 1 if x > 0 else 0)
+        _rawHistory["MoveDirection"] = _rawHistory["PriceChange"].apply(lambda x: 1 if x > 0 else 0)

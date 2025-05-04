@@ -4,7 +4,7 @@ import joblib as jl
 from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
 from scipy.signal import argrelextrema
 from constants import (
-    DAYS_PREDICTION_FORWARD,
+    INTERVALS_PREDICTION_FORWARD,
     SCALER_TYPE,
     SPLIT_DATE,
     MERGED_CSV_FILE_NAME,
@@ -22,7 +22,7 @@ class PrepareRNNData:
                  csvDataFile=MERGED_CSV_FILE_NAME,
                  analisysIndicators=ANALISYS_INDICATORS,
                  scalerType=SCALER_TYPE,
-                 daysPredictionForward=DAYS_PREDICTION_FORWARD):
+                 intervalsPredictionForward=INTERVALS_PREDICTION_FORWARD):
         
         # Czytamy dane z podanego pliku *.csv
         self.df = pd.read_csv(csvDataFile)
@@ -48,8 +48,7 @@ class PrepareRNNData:
 
         # Skalowanie targetu
         self.targetScaler = TargetScalerClass()
-        # self.df["TargetScaled"] = self.targetScaler.fit_transform(self.df[["Daily%Change"]].shift(-DAYS_PREDICTION_FORWARD))
-        self.df["TargetScaled"] = self.targetScaler.fit_transform(self.df[[TARGET_COLUMN]].shift(-DAYS_PREDICTION_FORWARD))
+        self.df["TargetScaled"] = self.targetScaler.fit_transform(self.df[[TARGET_COLUMN]].shift(-INTERVALS_PREDICTION_FORWARD))
 
         # Usuwamy puste linie
         self.df.dropna(inplace=True)
