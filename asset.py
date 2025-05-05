@@ -44,7 +44,7 @@ class Asset:
         rawHistory['RSI'] = self.calculateRSI(_rawHistory=rawHistory)
 
         rawHistory = self.calculateEMA(EMAPeriodArray=EMAPeriodList, _rawHistory=rawHistory)
-
+        rawHistory = self.calculateMACD(_rawHistory=rawHistory)
         if USE_FIBO is True:
             rawHistory = self.addFiboLevels(rawHistory)
 
@@ -93,6 +93,16 @@ class Asset:
         for period in EMAPeriodArray:
             _rawHistory[f"EMA{period}"] = _rawHistory["Close"].ewm(span=period, adjust=False).mean()
             _rawHistory.iloc[:period-1, _rawHistory.columns.get_loc(f"EMA{period}")] = None
+
+        return _rawHistory
+    
+    def calculateMACD(self, _rawHistory=None):
+        if _rawHistory is None:
+            raise ValueError("No data file in calculateMACD!")
+        
+        _rawHistory["MACD"] = _rawHistory["Close"].ewm(span=12, adjust=False).mean() - _rawHistory["Close"].ewm(span=26, adjust=False).mean()
+        _rawHistory["MACD_Signal"] = _rawHistory["MACD"].ewm(span=9, adjust=False).mean()
+        _rawHistory["MACD_Histogram"] = _rawHistory["MACD"] - _rawHistory["MACD_Signal"]
 
         return _rawHistory
     

@@ -84,7 +84,6 @@ class RNNLSTMModel:
         elif reLu == "tanh":
             model.add(tf.keras.layers.Activation('tanh'))
 
-        model.add(Dropout(dropout))
 
         model.add(Dense(dense))  # wynik końcowy
 
@@ -103,11 +102,18 @@ class RNNLSTMModel:
     
     def train(self, epochs=EPOCHS,
               batchSize=BATCH_SIZE):
+        # Wazenie strat, aby faworyzowac odstajace wartosci
+        sample_weights = np.abs(self.yTrain)
+        # Przyciecie minimalnej wagi, aby uniknac zer
+        sample_weights = np.clip(sample_weights, 1e-5, None)
+
+
         history = self.model.fit(self.XTrain, self.yTrain,
                                  epochs=epochs,
                                  batch_size=batchSize,
                                  validation_data=(self.XVal, self.yVal),
-                                 verbose=1
+                                 verbose=1,
+                                 sample_weight=sample_weights
                                  )
         self.evaluate()
         self.plotLoss(history)
@@ -165,9 +171,40 @@ class RNNLSTMModel:
             realPredictions = predictions
             realYTest = self.yTest.reshape(-1, 1)
 
+        # Wydruk tekstowy
         print(f"Predictions Vs Real ({howMany} first):")
         for pred, real in zip(realPredictions[:howMany], realYTest[:howMany]):
             print(f"Pred: {pred[0]:+6.3f}%, Real: {real[0]:+6.3f}%")
+
+        # Wykres + parametry obok
+        fig, (ax_pred, ax_params) = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
+
+        # Panel wykresu predykcji vs rzeczywiste wartości
+        ax_pred.plot(realYTest[:howMany], label="Real", marker='o')
+        ax_pred.plot(realPredictions[:howMany], label="Predicted", marker='x')
+        ax_pred.set_title("Predictions vs Real")
+        ax_pred.set_xlabel("Sample")
+        ax_pred.set_ylabel("Change [%]")
+        ax_pred.legend()
+        ax_pred.grid(True)
+
+        # Panel z parametrami
+        param_text = (
+            f"Neurons: {NUMBER_OF_NEURONS}\n"
+            f"Dropout: {DROPOUT}\n"
+            f"Return Sequences: {RETURN_SEQUENCES}\n"
+            f"ReLU type: {RE_LU}" + (f" (alpha={NEGATIVE_SLOPE})" if RE_LU == "Leaky" else "") + "\n"
+            f"Batch Size: {BATCH_SIZE}\n"
+            f"Epochs: {EPOCHS}\n"
+            f"Loss: {LOSS}" + (f": (delta={HUBER_DELTA})" if LOSS == "Huber" else "") + "\n"
+            f"Scaler: {SCALER_TYPE}\n"
+            f"Prediction forward: +{INTERVALS_PREDICTION_FORWARD} interval(s)"
+        )
+        ax_params.axis('off')
+        ax_params.text(0.01, 0.98, param_text, va='top', fontsize=10)
+
+        plt.tight_layout()
+        plt.show(block=False)
 
     def evaluateDirectionAccuracy(self):
         predictions = self.model.predict(self.XTest)

@@ -46,7 +46,9 @@ ANALISYS_INDICATORS_OLD = ["Open", "Close", "High", "Low", "Volume", "RSI",
                       "EMA50_DXY", "EMA200_DXY", "PriceChange_DXY"]
 
 ANALISYS_INDICATORS = ["Open", "Close", "High", "Low", "Volume", "RSI",
-                            "EMA12", "EMA26", "EMA50", "EMA200", "PriceChange", "Close_DXY"]
+                            "EMA12", "EMA26", "EMA50", "EMA200", "PriceChange",
+                            "Close_DXY", "MACD", "MACD_Signal", "MACD_Histogram",
+                            "MoveDirection"]
 SCALER_TYPE = "standard"    # "robust" - robust scaler
                             # "standard" - standard scaler
                             # "minmax" - MinMaxScaler
@@ -67,20 +69,20 @@ FIBO_LEVELS = [0.236, 0.382, 0.5, 0.618, 0.786]
 
 
 # Parametry modelu
-NUMBER_OF_NEURONS = 512
-DROPOUT = 0.15
+NUMBER_OF_NEURONS = 256
+DROPOUT = 0.2
 DENSE = 1
 RETURN_SEQUENCES = True # True - dodaje druga i trzecia warstwe,
                         # False - pozostaje jedna warstwa
-NEGATIVE_SLOPE = 0.6
+NEGATIVE_SLOPE = 0.2
 RE_LU = "Leaky" # "Leaky" - LeakyReLu
                 # "P" - PReLu
                 # "_ReLu" - standardowy ReLu
                 # "tanh" - tanh
-HUBER_DELTA = 0.2
+HUBER_DELTA = 0.75
 LOSS = "Huber"  # "Huber" - Huber
                 # "mse" - mse
-                # "binary_crossentropy"
+                # "binary_crossentropy" - dla binarnej klasifikacji
 
 
 
@@ -90,7 +92,7 @@ LOSS = "Huber"  # "Huber" - Huber
 
 # Parametry uczenia
 BATCH_SIZE = 32
-EPOCHS = 65
+EPOCHS = 75
 INTERVALS_PREDICTION_FORWARD = 1  # Przewidywanie o jeden interwał do przodu
 
 
