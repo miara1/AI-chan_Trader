@@ -6,9 +6,15 @@ from constants import EMAPeriodList, FIBO_LEVELS, USE_FIBO
 from scipy.signal import argrelextrema
 import numpy as np
 from constants import TIME_INTERVAL
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential
+import pickle
 
 # Klasa dla ustalonego aktywa
 class Asset:
+    _cache = {}
+    _cache_file = "asset_cache.pkl"
+    
     def __init__(self, symbol, interval = TIME_INTERVAL, period = "max", start = None ):
         self.symbol = symbol
         self.interval = interval
@@ -16,14 +22,47 @@ class Asset:
         self.start = start
         self.data = self.preProcessHistory()
         self.csvFile = None
+        
+        # Wczytaj cache z pliku przy inicjalizacji
+        self._load_cache()
 
+    def _load_cache(self):
+        if os.path.exists(self._cache_file):
+            try:
+                with open(self._cache_file, 'rb') as f:
+                    Asset._cache = pickle.load(f)
+            except:
+                Asset._cache = {}
+
+    def _save_cache(self):
+        with open(self._cache_file, 'wb') as f:
+            pickle.dump(Asset._cache, f)
 
     # Pobieranie historii o aktywie z yahoo finance
     def getHistory(self):
-        asset = yf.Ticker(self.symbol)
-        history = asset.history(period = self.period, interval = self.interval,
-                                start = self.start)
-        return history
+        cache_key = f"{self.symbol}_{self.interval}_{self.period}_{self.start}"
+        
+        if cache_key in Asset._cache:
+            return Asset._cache[cache_key]
+        
+        # Jeśli nie ma w cache'u, pobieramy dane
+        @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+        def download_with_retry():
+            time.sleep(1)  # Dodajemy opóźnienie między zapytaniami
+            asset = yf.Ticker(self.symbol)
+            return asset.history(period=self.period, 
+                               interval=self.interval,
+                               start=self.start)
+        
+        try:
+            data = download_with_retry()
+            # Zapisujemy do cache'u
+            Asset._cache[cache_key] = data
+            self._save_cache()  # Zapisz cache na dysk
+            return data
+        except Exception as e:
+            print(f"Błąd podczas pobierania danych dla {self.symbol}: {e}")
+            raise
     
 
     # Sformatuj poprawnie dane

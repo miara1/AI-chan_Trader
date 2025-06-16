@@ -20,10 +20,13 @@ from constants import (
     LOSS,
     HUBER_DELTA,
     IS_BINARY_PREDICTION,
-    SAVE_PATH
+    SAVE_PATH,
+    EARLY_STOP_PATIENCE,
+    OPTIMIZER
     )
 from joblib import load
 import numpy as np
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 class RNNLSTMModel:
     def __init__(self, XTrain, yTrain, XVal, yVal, XTest, yTest):
@@ -51,58 +54,55 @@ class RNNLSTMModel:
         # wlaczenia return sequences
         if returnSequences is True:
             # Druga warstwa LSTM
-            model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
+            model.add(LSTM(numberOfNeurons // 2, return_sequences=True))
 
             model.add(Dropout(dropout))
 
             # Trzecia warstwa LSTM
-            # model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
-            # model.add(Dropout(dropout))
+            model.add(LSTM(numberOfNeurons // 4, return_sequences=False))
+            model.add(Dropout(dropout))
 
         if IS_BINARY_PREDICTION:
+            model.add(Dense(numberOfNeurons // 2))
+
+            # Wybierz ReLU
+            if reLu == "_ReLu":
+                model.add(tf.keras.layers.ReLU())
+            elif reLu == "Leaky": 
+                model.add(LeakyReLU(negative_slope=negativeSlope))
+            elif reLu == "P":
+                model.add(PReLU())
+            elif reLu == "tanh":
+                model.add(tf.keras.layers.Activation('tanh'))
+            # Dodajemy warstwę gęstą z aktywacją ReLU
+            model.add(Dropout(dropout))
             model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
         else:
             model.add(Dense(numberOfNeurons // 2))
         
         
-        # Wybierz ReLU
-        if reLu == "_ReLu":
-            model.add(tf.keras.layers.ReLU())
-        elif reLu == "Leaky": 
-            model.add(LeakyReLU(negative_slope=negativeSlope))
-        elif reLu == "P":
-            model.add(PReLU())
-        elif reLu == "tanh":
-            model.add(tf.keras.layers.Activation('tanh'))
+            # Wybierz ReLU
+            if reLu == "_ReLu":
+                model.add(tf.keras.layers.ReLU())
+            elif reLu == "Leaky": 
+                model.add(LeakyReLU(negative_slope=negativeSlope))
+            elif reLu == "P":
+                model.add(PReLU())
+            elif reLu == "tanh":
+                model.add(tf.keras.layers.Activation('tanh'))
 
-        model.add(Dropout(dropout))
+            model.add(Dropout(dropout))
 
-        if IS_BINARY_PREDICTION:
-            model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
-        else:
-            model.add(Dense(numberOfNeurons // 4))
-        
-        # Wybierz ReLU
-        if reLu == "_ReLu":
-            model.add(tf.keras.layers.ReLU())
-        elif reLu == "Leaky": 
-            model.add(LeakyReLU(negative_slope=negativeSlope))
-        elif reLu == "P":
-            model.add(PReLU())
-        elif reLu == "tanh":
-            model.add(tf.keras.layers.Activation('tanh'))
-
-
-        model.add(Dense(dense))  # wynik końcowy
+            model.add(Dense(dense))  # wynik końcowy
 
         
         # Wybierz jak obliczac loss
         if loss == "mse":
-            model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+            model.compile(optimizer=OPTIMIZER, loss='mse', metrics=['mae'])
         elif loss == "Huber":
-            model.compile(optimizer='adam', loss=tf.keras.losses.Huber(delta=huber_delta), metrics=['mae'])
+            model.compile(optimizer=OPTIMIZER, loss=tf.keras.losses.Huber(delta=huber_delta), metrics=['mae'])
         elif loss == "binary_crossentropy":
-            model.compile(optimizer='adam', loss="binary_crossentropy", metrics=['accuracy'])
+            model.compile(optimizer=OPTIMIZER, loss="binary_crossentropy", metrics=['accuracy', 'binary_accuracy'])
         else:
             raise NameError(f"Loss not recognized '{loss}'")
         
@@ -112,16 +112,21 @@ class RNNLSTMModel:
               batchSize=BATCH_SIZE,
               save_path = SAVE_PATH):
         # Wazenie strat, aby faworyzowac odstajace wartosci
-        sample_weights = np.abs(self.yTrain)
-        # Przyciecie minimalnej wagi, aby uniknac zer
-        sample_weights = np.clip(sample_weights, 1e-5, None)
+        if IS_BINARY_PREDICTION:
+            sample_weights = None  # Nie używaj wag dla klasyfikacji binarnej
+        else:
+            sample_weights = np.abs(self.yTrain)
+            sample_weights = np.clip(sample_weights, 1e-5, None)
 
         # Dodaj early stopping
-        early_stop = EarlyStopping(
-            monitor='val_loss',      # patrz na stratę walidacyjną
-            patience=10,             # ile epok bez poprawy czekać (możesz zmienić)
-            restore_best_weights=True
-        )   
+        callbacks = []
+        if EARLY_STOP_PATIENCE is not None:
+            early_stop = EarlyStopping(
+                monitor='val_loss',
+                patience=EARLY_STOP_PATIENCE,
+                restore_best_weights=True
+            )
+            callbacks.append(early_stop)
 
 
         history = self.model.fit(self.XTrain, self.yTrain,
@@ -130,7 +135,7 @@ class RNNLSTMModel:
                                  validation_data=(self.XVal, self.yVal),
                                  verbose=1,
                                  sample_weight=sample_weights,
-                                 callbacks=[early_stop]
+                                 callbacks=callbacks
                                  )
         self.evaluate()
         self.plotLoss(history)
@@ -173,24 +178,60 @@ class RNNLSTMModel:
         plt.show(block=False)
 
     def evaluate(self):
-        mse, mae = self.model.evaluate(self.XTest, self.yTest)
-        print(f"\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\nTest MSE: {mse:.4f}\nTest MAE: {mae:0.4f}\n!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n")
+        if IS_BINARY_PREDICTION:
+            # Dla klasyfikacji binarnej
+            loss, accuracy, binary_accuracy = self.model.evaluate(self.XTest, self.yTest)
+            
+            # Pobierz predykcje i przekonwertuj na etykiety binarne
+            predictions = self.model.predict(self.XTest)
+            predictions = (predictions > 0.5).astype(int)
+            
+            # Oblicz dodatkowe metryki
+            precision = precision_score(self.yTest, predictions)
+            recall = recall_score(self.yTest, predictions)
+            f1 = f1_score(self.yTest, predictions)
+            
+            print(f"\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print(f"Test Loss: {loss:.4f}")
+            print(f"Test Accuracy: {accuracy:.4f}")
+            print(f"Test Binary Accuracy: {binary_accuracy:.4f}")
+            print(f"Precision: {precision:.4f}")
+            print(f"Recall: {recall:.4f}")
+            print(f"F1-score: {f1:.4f}")
+            print(f"!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n")
+        else:
+            # Dla regresji
+            mse, mae = self.model.evaluate(self.XTest, self.yTest)
+            print(f"\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print(f"Test MSE: {mse:.4f}")
+            print(f"Test MAE: {mae:0.4f}")
+            print(f"!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n")
 
     def predict(self):
-        return self.model.predict(self.XTest)
+        predictions = self.model.predict(self.XTest)
+        if IS_BINARY_PREDICTION:
+            return (predictions > 0.5).astype(int)  # Konwersja na 0/1
+        return predictions
     
 
     def evaluateDirectionAccuracy(self):
         predictions = self.model.predict(self.XTest)
-
-        try:
-            targetScaler = load(TARGET_SCALER_FILE)
-            realPredictions = targetScaler.inverse_transform(predictions)
-            realYTest = targetScaler.inverse_transform(self.yTest.reshape(-1, 1))
-        except FileNotFoundError:
-            print("Scaler file not found! Showing scaled values!")
+        
+        if IS_BINARY_PREDICTION:
+            # Konwertuj prawdopodobieństwa na etykiety binarne
+            predictions = (predictions > 0.5).astype(int)
             realPredictions = predictions
             realYTest = self.yTest.reshape(-1, 1)
+        else:
+            # Dla regresji używamy skalera
+            try:
+                targetScaler = load(TARGET_SCALER_FILE)
+                realPredictions = targetScaler.inverse_transform(predictions)
+                realYTest = targetScaler.inverse_transform(self.yTest.reshape(-1, 1))
+            except FileNotFoundError:
+                print("Scaler file not found! Showing scaled values!")
+                realPredictions = predictions
+                realYTest = self.yTest.reshape(-1, 1)
 
         # Oblicz trafnosc kierunku
         predSigns = np.sign(realPredictions)

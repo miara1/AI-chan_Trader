@@ -42,8 +42,8 @@ mergedFile = MergeDataProcessor(BTC_CSV_FILE_NAME, DXY_CSV_FILE_NAME)
 mergedFile.saveToCsv(MERGED_CSV_FILE_NAME)
 
 RNNData = PrepareRNNData()
-RNNData.savePreparedDataToCsv("TrainData.csv")
-RNNData.savePreparedDataToCsv("TestData.csv", False)
+RNNData.savePreparedDataToCsv("./DataAndScalerFiles/TrainData.csv")
+RNNData.savePreparedDataToCsv("./DataAndScalerFiles/TestData.csv", False)
 
 # Tworzenie i trenowanie modelu
 model = RNNLSTMModel(RNNData.XTrain, RNNData.yTrain,
