@@ -14,7 +14,8 @@ from constants import (
     TARGET_SCALER_FILE,
     FIBO_LEVELS,
     TARGET_COLUMN,
-    SPLIT_RATIO
+    SPLIT_RATIO,
+    IS_BINARY_PREDICTION
     )
 
 class PrepareRNNData:
@@ -47,8 +48,15 @@ class PrepareRNNData:
         
 
         # Skalowanie targetu
-        self.targetScaler = TargetScalerClass()
-        self.df["TargetScaled"] = self.targetScaler.fit_transform(self.df[[TARGET_COLUMN]].shift(-INTERVALS_PREDICTION_FORWARD))
+        if IS_BINARY_PREDICTION:
+            # Nie skalujemy binarnego targetu
+            self.targetScaler = None
+            self.df["TargetScaled"] = self.df[TARGET_COLUMN].shift(-INTERVALS_PREDICTION_FORWARD)
+        else:
+            self.targetScaler = TargetScalerClass()
+            self.df["TargetScaled"] = self.targetScaler.fit_transform(
+                self.df[[TARGET_COLUMN]].shift(-INTERVALS_PREDICTION_FORWARD)
+            )
 
         # Usuwamy puste linie
         self.df.dropna(inplace=True)

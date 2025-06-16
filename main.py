@@ -1,6 +1,6 @@
 from asset import Asset
 from constants import BTCUSD, BTC_CSV_FILE_NAME
-from constants import DXY_CSV_FILE_NAME, DXY, DXY_START_DATE
+from constants import DXY_CSV_FILE_NAME, DXY, ASSETS_START_DATE
 from constants import MERGED_CSV_FILE_NAME, TARGET_SCALER_FILE
 import matplotlib.pyplot as plt
 from mergeDataProcessor import MergeDataProcessor
@@ -12,7 +12,7 @@ from tensorflow.python.client import device_lib
 import os
 import tensorflow as tf
 from constants import TIME_INTERVAL
-
+import time
 # from keras.backend.tensorflow_backend import set_session
 
 # Wypisac co mozemy zoptymalizowac, jakie wersje mozemy testowac
@@ -29,10 +29,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 print(device_lib.list_local_devices())
 
-btcusd = Asset(symbol=BTCUSD, interval=TIME_INTERVAL, period="max")
-dxy = Asset(symbol=DXY, interval=TIME_INTERVAL, start=DXY_START_DATE)
+btcusd = Asset(symbol=BTCUSD, interval=TIME_INTERVAL, start=ASSETS_START_DATE, period=None)
+dxy = Asset(symbol=DXY, interval=TIME_INTERVAL, start=ASSETS_START_DATE, period=None)
 
 btcusd.saveHistoryToCsv(fileName=BTC_CSV_FILE_NAME)
+time.sleep(1)
 dxy.saveHistoryToCsv(fileName=DXY_CSV_FILE_NAME)
 
 dxy.deleteRow(name="Volume")

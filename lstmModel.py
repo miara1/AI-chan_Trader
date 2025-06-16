@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.layers import LeakyReLU, PReLU
+from tensorflow.keras.callbacks import EarlyStopping
 import matplotlib.pyplot as plt
 from constants import (
     RETURN_SEQUENCES,
@@ -17,7 +18,9 @@ from constants import (
     SCALER_TYPE,
     INTERVALS_PREDICTION_FORWARD,
     LOSS,
-    HUBER_DELTA
+    HUBER_DELTA,
+    IS_BINARY_PREDICTION,
+    SAVE_PATH
     )
 from joblib import load
 import numpy as np
@@ -56,8 +59,11 @@ class RNNLSTMModel:
             # model.add(LSTM(numberOfNeurons // 2, return_sequences=False))
             # model.add(Dropout(dropout))
 
-        model.add(Dense(numberOfNeurons // 2))
-        # model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
+        if IS_BINARY_PREDICTION:
+            model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
+        else:
+            model.add(Dense(numberOfNeurons // 2))
+        
         
         # Wybierz ReLU
         if reLu == "_ReLu":
@@ -71,8 +77,10 @@ class RNNLSTMModel:
 
         model.add(Dropout(dropout))
 
-        model.add(Dense(numberOfNeurons // 4))
-        # model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
+        if IS_BINARY_PREDICTION:
+            model.add(Dense(1, activation='sigmoid'))  # Dla danych binarnych 0/1
+        else:
+            model.add(Dense(numberOfNeurons // 4))
         
         # Wybierz ReLU
         if reLu == "_ReLu":
@@ -101,11 +109,19 @@ class RNNLSTMModel:
         return model
     
     def train(self, epochs=EPOCHS,
-              batchSize=BATCH_SIZE):
+              batchSize=BATCH_SIZE,
+              save_path = SAVE_PATH):
         # Wazenie strat, aby faworyzowac odstajace wartosci
         sample_weights = np.abs(self.yTrain)
         # Przyciecie minimalnej wagi, aby uniknac zer
         sample_weights = np.clip(sample_weights, 1e-5, None)
+
+        # Dodaj early stopping
+        early_stop = EarlyStopping(
+            monitor='val_loss',      # patrz na stratę walidacyjną
+            patience=10,             # ile epok bez poprawy czekać (możesz zmienić)
+            restore_best_weights=True
+        )   
 
 
         history = self.model.fit(self.XTrain, self.yTrain,
@@ -113,12 +129,16 @@ class RNNLSTMModel:
                                  batch_size=batchSize,
                                  validation_data=(self.XVal, self.yVal),
                                  verbose=1,
-                                 sample_weight=sample_weights
+                                 sample_weight=sample_weights,
+                                 callbacks=[early_stop]
                                  )
         self.evaluate()
         self.plotLoss(history)
         self.evaluateDirectionAccuracy()
         self.printPredictionsVsActual()
+        if save_path is not None:
+            self.model.save(save_path)
+            print(f"Model saved to {save_path}")
 
     def plotLoss(self, history):
 
@@ -159,52 +179,6 @@ class RNNLSTMModel:
     def predict(self):
         return self.model.predict(self.XTest)
     
-    def printPredictionsVsActual(self, howMany=HOW_MANY_OUTPUTS):
-        predictions = self.model.predict(self.XTest)
-
-        try:
-            targetScaler = load(TARGET_SCALER_FILE)
-            realPredictions = targetScaler.inverse_transform(predictions)
-            realYTest = targetScaler.inverse_transform(self.yTest.reshape(-1, 1))
-        except FileNotFoundError:
-            print("Scaler file not found! Showing scaled values!")
-            realPredictions = predictions
-            realYTest = self.yTest.reshape(-1, 1)
-
-        # Wydruk tekstowy
-        print(f"Predictions Vs Real ({howMany} first):")
-        for pred, real in zip(realPredictions[:howMany], realYTest[:howMany]):
-            print(f"Pred: {pred[0]:+6.3f}%, Real: {real[0]:+6.3f}%")
-
-        # Wykres + parametry obok
-        fig, (ax_pred, ax_params) = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
-
-        # Panel wykresu predykcji vs rzeczywiste wartości
-        ax_pred.plot(realYTest[:howMany], label="Real", marker='o')
-        ax_pred.plot(realPredictions[:howMany], label="Predicted", marker='x')
-        ax_pred.set_title("Predictions vs Real")
-        ax_pred.set_xlabel("Sample")
-        ax_pred.set_ylabel("Change [%]")
-        ax_pred.legend()
-        ax_pred.grid(True)
-
-        # Panel z parametrami
-        param_text = (
-            f"Neurons: {NUMBER_OF_NEURONS}\n"
-            f"Dropout: {DROPOUT}\n"
-            f"Return Sequences: {RETURN_SEQUENCES}\n"
-            f"ReLU type: {RE_LU}" + (f" (alpha={NEGATIVE_SLOPE})" if RE_LU == "Leaky" else "") + "\n"
-            f"Batch Size: {BATCH_SIZE}\n"
-            f"Epochs: {EPOCHS}\n"
-            f"Loss: {LOSS}" + (f": (delta={HUBER_DELTA})" if LOSS == "Huber" else "") + "\n"
-            f"Scaler: {SCALER_TYPE}\n"
-            f"Prediction forward: +{INTERVALS_PREDICTION_FORWARD} interval(s)"
-        )
-        ax_params.axis('off')
-        ax_params.text(0.01, 0.98, param_text, va='top', fontsize=10)
-
-        plt.tight_layout()
-        plt.show(block=False)
 
     def evaluateDirectionAccuracy(self):
         predictions = self.model.predict(self.XTest)
@@ -251,3 +225,60 @@ class RNNLSTMModel:
 
         print(f"Direction accuracy: {accuracy * 100:.2f}% ({correct}/{total})")
         return accuracy
+    
+    def printPredictionsVsActual(self):
+        datasets = [
+            ("Test", self.XTest, self.yTest),
+            ("Train", self.XTrain, self.yTrain),
+            ("Validation", self.XVal, self.yVal)
+        ]
+
+        try:
+            targetScaler = load(TARGET_SCALER_FILE)
+        except FileNotFoundError:
+            targetScaler = None
+            print("Scaler file not found! Showing scaled values!")
+
+        for name, X, y in datasets:
+            predictions = self.model.predict(X)
+
+            if targetScaler:
+                realPredictions = targetScaler.inverse_transform(predictions)
+                realY = targetScaler.inverse_transform(y.reshape(-1, 1))
+            else:
+                realPredictions = predictions
+                realY = y.reshape(-1, 1)
+
+            # Wydruk przykładowych wartości (pierwsze 5)
+            print(f"\n{name} Set: Example Predictions Vs Real:")
+            for pred, real in zip(realPredictions[:5], realY[:5]):
+                print(f"Pred: {pred[0]:+6.3f}, Real: {real[0]:+6.3f}")
+
+            # Wykres
+            fig, (ax_pred, ax_params) = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
+
+            ax_pred.plot(realY, label="Real", marker='o', markersize=3)
+            ax_pred.plot(realPredictions, label="Predicted", marker='x', markersize=3)
+            ax_pred.set_title(f"{name} Set: Predictions vs Real")
+            ax_pred.set_xlabel("Sample")
+            ax_pred.set_ylabel("Change [%]" if not IS_BINARY_PREDICTION else "Class")
+            ax_pred.legend()
+            ax_pred.grid(True)
+
+            param_text = (
+                f"Set: {name}\n"
+                f"Neurons: {NUMBER_OF_NEURONS}\n"
+                f"Dropout: {DROPOUT}\n"
+                f"Return Sequences: {RETURN_SEQUENCES}\n"
+                f"ReLU type: {RE_LU}" + (f" (alpha={NEGATIVE_SLOPE})" if RE_LU == "Leaky" else "") + "\n"
+                f"Batch Size: {BATCH_SIZE}\n"
+                f"Epochs: {EPOCHS}\n"
+                f"Loss: {LOSS}" + (f": (delta={HUBER_DELTA})" if LOSS == "Huber" else "") + "\n"
+                f"Scaler: {SCALER_TYPE}\n"
+                f"Prediction forward: +{INTERVALS_PREDICTION_FORWARD} interval(s)"
+            )
+            ax_params.axis('off')
+            ax_params.text(0.01, 0.98, param_text, va='top', fontsize=10)
+
+            plt.tight_layout()
+            plt.show()

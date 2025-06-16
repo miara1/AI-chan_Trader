@@ -10,13 +10,14 @@ BTCUSD = "BTC-USD"
 BTC_CSV_FILE_NAME = "testBTCHistory.csv"
 DXY_CSV_FILE_NAME = "testDXYHistory.csv"
 MERGED_CSV_FILE_NAME = "testMergedFile.csv"
+SAVE_PATH = "./FinalResults/Models/1.keras"
 
 
 #================================================================
 
 
-# Data rozpoczecia indeksu DXY
-DXY_START_DATE = "2014-09-17"
+# Data rozpoczecia pobierania danych aktywow
+ASSETS_START_DATE = "2015-01-01"
 
 
 #================================================================
@@ -74,8 +75,8 @@ DROPOUT = 0.2
 DENSE = 1
 RETURN_SEQUENCES = True # True - dodaje druga i trzecia warstwe,
                         # False - pozostaje jedna warstwa
-NEGATIVE_SLOPE = 0.2
-RE_LU = "Leaky" # "Leaky" - LeakyReLu
+NEGATIVE_SLOPE = 1
+RE_LU = "_ReLu" # "Leaky" - LeakyReLu
                 # "P" - PReLu
                 # "_ReLu" - standardowy ReLu
                 # "tanh" - tanh
@@ -91,8 +92,8 @@ LOSS = "Huber"  # "Huber" - Huber
 
 
 # Parametry uczenia
-BATCH_SIZE = 32
-EPOCHS = 75
+BATCH_SIZE = 16
+EPOCHS = 100
 INTERVALS_PREDICTION_FORWARD = 1  # Przewidywanie o jeden interwał do przodu
 
 
@@ -103,4 +104,15 @@ INTERVALS_PREDICTION_FORWARD = 1  # Przewidywanie o jeden interwał do przodu
 
 # Parametry wyniku
 HOW_MANY_OUTPUTS = 100
-TARGET_COLUMN = "PriceChange"
+TARGET_COLUMN = "Close"
+IS_BINARY_PREDICTION = False
+# Zbadac czy dla Close jest lepsze niz PriceChange
+# Sprawdzic czy przewiduje sam znak
+# Przesuwanie okienka czasowego
+
+# Wykreslic jak przebiega PriceChange dla trenigowego i walidacynego
+
+
+#Zrobic testy i porownac wyniki
+
+# Skrocic caly zakres danych, skrocic dane testowe i walidacyjne
